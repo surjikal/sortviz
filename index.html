@@ -1,0 +1,315 @@
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <link href="https://fonts.googleapis.com/css?family=Raleway&display=swap" rel="stylesheet">
+    <style>
+    * {
+        box-sizing: border-box;
+    }
+    html, body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        background: #121212;
+        font-family: 'Raleway', sans-serif;
+    }
+    body {
+        display: flex;
+        flex-direction: row;
+        align-items: stretch;
+        overflow: hidden;
+        padding: 40px;
+    }
+    div:first-child {
+        flex: 1 0 1px !important;
+    }
+    div {
+        margin: 10px;
+        flex: 1 0 0px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+        color: #444;
+        overflow: hidden;
+    }
+    div p {
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 3px;
+        transition: 0.6s;
+        font-weight: 200;
+    }
+    canvas {
+        /*overflow: hidden;*/
+        transition: 0.3s;
+        height: 100%;
+        width: calc(100% + 2px);
+        image-rendering: pixelated;
+    }
+    </style>
+</head>
+
+<body>
+
+    <script type="module">
+
+    const DATA_SIZE = 200; // how many rows, 250 is basically the limit
+    const CHUNK_SIZE = 256; // higher is slower to render
+
+    function range(n) {
+        let result = new Uint8Array(n);
+        while (--n >= 0) { result[n] = n+1; }
+        return result;
+    }
+
+    function sum(array) {
+        return array.reduce((sum, x) => sum+x, 0);
+    }
+
+    let seed = Math.random();
+    function random() {
+        var x = Math.sin(seed++) * 10000;
+        return x - Math.floor(x);
+    }
+
+    function generate(size) {
+        let arr = range(size);
+        arr.sort(() => random() - 0.5);
+        return arr;
+    }
+
+    function hsl2rgb(h,s,l) {
+        let a=s*Math.min(l,1-l);
+        let f= (n,k=(n+h/30)%12) => l - a*Math.max(Math.min(k-3,9-k,1),-1);
+        return [Math.round(f(0) * 255),Math.round(f(8) * 255), Math.round(f(4) * 255)];
+    }
+
+    function getColor(value, size) {
+        let colorIndex = 10 + Math.floor((value / size) * 250);
+        return hsl2rgb(colorIndex, 0.89, 0.65);
+    }
+
+    function chunk(arr, size) {
+        const result = [];
+        let index = 0;
+        while (index < arr.length) {
+          result.push(arr.slice(index, size + index));
+          index += size;
+        }
+        return result;
+    }
+
+    function Generators(size) {
+
+        function wrapper(fn) { return () => {
+            let data = generate(size);
+            let result = Array.from(fn(data), (x) => x.slice(0));
+            if (result.length % 2 == 0) {
+                result.push(result[result.length-1]);
+            }
+            return result;
+        }}
+
+        // The sort functions were stolen almost as-is from various parts of the internet
+        return {
+            noop: wrapper(function* (arr) {
+                yield arr.slice(0);
+                return;
+            }),
+            bubble: wrapper(function* (arr) {
+                for (let j = arr.length - 1; j > 0; j--) {
+                  for (let i = 0; i < j; i++) {
+                    if (arr[i] > arr[i + 1]) {
+                      let temp = arr[i];
+                      arr[i] = arr[i + 1];
+                      arr[i + 1] = temp;
+                      yield arr;
+                    }
+                  }
+                }
+                yield arr;
+                return;
+            }),
+            selection: wrapper(function* (arr) {
+                var minIdx, temp, len = arr.length;
+                for(var i = 0; i < len; i++){
+                  minIdx = i;
+                  for(var j = i+1; j<len; j++){
+                     if (arr[j]<arr[minIdx]) {
+                        minIdx = j;
+                     }
+                  }
+                  temp = arr[i];
+                  arr[i] = arr[minIdx];
+                  yield arr;
+                  arr[minIdx] = temp;
+                  yield arr;
+                }
+                return;
+            }),
+            radix: wrapper(function* (arr) {
+                const maxNum = Math.max(...arr) * 10;
+                let divisor = 10;
+                while (divisor < maxNum) {
+                    let buckets = [...Array(10)].map(() => []);
+                    for (let num of arr) {
+                      buckets[Math.floor((num % divisor) / (divisor / 10))].push(num);
+                    }
+                    arr = [].concat.apply([], buckets);
+                    yield arr;
+                    divisor *= 10;
+                }
+                return;
+            }),
+            insertion: wrapper(function* (arr) {
+                var i, len = arr.length, el, j;
+                for (i = 1; i<len; i++) {
+                  let toInsert = arr[i];
+                  j = i;
+                  while (j>0 && arr[j-1] > toInsert) {
+                    arr[j] = arr[j-1];
+                    yield arr;
+                    j--;
+                 }
+                 arr[j] = toInsert;
+                 yield arr;
+                }
+                return;
+            }),
+            quick: wrapper(function* (a, l, r) {
+              var i, s, p, v, t, x, y;
+
+              l = l || 0;
+              r = r || a.length - 1;
+
+              i = 2;
+              s = [l, r];
+
+              while (i > 0) {
+                  r = s[--i];
+                  l = s[--i];
+
+                  if (l < r) {
+                      // partition
+
+                      x = l;
+                      y = r - 1;
+
+                      p = l;
+                      v = a[p];
+                      a[p] = a[r];
+                      yield a.slice(0);
+                      while (true) {
+                          while (
+                              x <= y &&
+                              a[x] != undefined &&
+                              a[x] < v)
+                              x++;
+                          while (
+                              x <= y &&
+                              a[y] != undefined &&
+                              a[y] >= v)
+                              y--;
+                          if (x > y)
+                              break;
+                          t = a[x];
+                          a[x] = a[y];
+                          yield a;
+                          a[y] = t;
+                          yield a;
+                      }
+
+                      a[r] = a[x];
+                      yield a;
+                      a[x] = v;
+                      yield a;
+
+                      // end
+
+                      s[i++] = l;
+                      s[i++] = x - 1;
+                      s[i++] = x + 1;
+                      s[i++] = r;
+                  }
+              }
+            })
+        };
+    }
+
+    function init(size) {
+        let generators = Generators(size);
+
+        Object.keys(generators).forEach((key, index) => {
+            let dataset = generators[key]();
+            let {container, canvas} = createWidget(key);
+            document.body.appendChild(container);
+            renderer(canvas, dataset);
+        });
+    }
+
+    function createWidget(sortName) {
+        let container = document.createElement("div");
+        var canvas = document.createElement('canvas');
+        let label = document.createElement('p');
+        label.appendChild(document.createTextNode(sortName));
+        container.appendChild(canvas);
+        container.appendChild(label);
+        return {container:container, canvas:canvas};
+    }
+
+    function renderer(canvas, dataset) {
+        let ctx = canvas.getContext("2d", { alpha: false });
+        let image = ctx.createImageData(dataset.length || 1, (dataset[0] || [1]).length);
+
+        let chunkSize = Math.floor(dataset.length / CHUNK_SIZE) + 1;
+        let chunks = chunk(dataset, chunkSize);
+
+        let chunkIndex = 0;
+        let lastRenderTimestamp = 0;
+        let minUpdateInterval = 0; // slows down the animation if you want
+
+        function initCanvasContext(ctx) {
+            ctx.imageSmoothingEnabled = false;
+            ctx.canvas.width  = dataset.length;
+            ctx.canvas.height = (dataset[0] || []).length;
+            animate();
+        }
+
+        function render(columns, columnIndex) {
+            let rows = columns[columnIndex];
+            if (!rows) return;
+            for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+                let pixelIndex = (columnIndex + (columns.length * rowIndex)) * 4;
+                let [r,g,b] = getColor(rows[rowIndex], rows.length);
+                image.data[pixelIndex + 0] = r;
+                image.data[pixelIndex + 1] = g;
+                image.data[pixelIndex + 2] = b;
+                image.data[pixelIndex + 3] = 255;
+            }
+            ctx.putImageData(image, 0, 0, columnIndex, 0, 1, rows.length);
+        }
+
+        function animate(timestamp) {
+            if (chunkIndex >= chunks.length) return;
+
+            requestAnimationFrame(animate);
+            let timeSinceLastRender = timestamp - lastRenderTimestamp;
+            if (timeSinceLastRender < minUpdateInterval) return;
+            lastRenderTimestamp = timestamp;
+
+            for (let i = 0; i < chunks[chunkIndex].length; i+=1) {
+                render(dataset, chunkIndex * chunks[chunkIndex].length + i);
+            }
+            chunkIndex = chunkIndex + 1;
+        }
+
+        initCanvasContext(ctx);
+    }
+
+    init(DATA_SIZE);
+    </script>
+
+</body>
