@@ -276,7 +276,7 @@
 
     function renderer(canvas, dataset) {
         let ctx = canvas.getContext("2d", { alpha: false });
-        let image = ctx.createImageData(dataset.length || 1, (dataset[0] || [1]).length);
+        let image = ctx.createImageData(dataset.length || 1, (dataset[0] || []).length || 1);
 
         let chunkSize = Math.floor(dataset.length / CHUNK_SIZE) + 1;
         let chunks = chunk(dataset, chunkSize);
@@ -289,7 +289,6 @@
             ctx.imageSmoothingEnabled = false;
             ctx.canvas.width  = dataset.length;
             ctx.canvas.height = (dataset[0] || []).length;
-            animate();
         }
 
         function render(columns, columnIndex) {
@@ -321,6 +320,7 @@
         }
 
         initCanvasContext(ctx);
+        animate();
     }
 
     init(DATA_SIZE);
