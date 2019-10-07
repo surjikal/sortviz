@@ -8,6 +8,7 @@
     <style>
     * {
         box-sizing: border-box;
+        margin: 0; padding: 0;
     }
     html, body {
         width: 100%;
@@ -22,34 +23,49 @@
         flex-direction: row;
         align-items: stretch;
         overflow: hidden;
-        padding: 40px;
-    }
-    div:first-child {
-        flex: 1 0 1px !important;
+        padding: 20px;
     }
     div {
-        margin: 10px;
+        padding: 20px;
         flex: 1 0 0px;
+        min-height: 0;
+
+        position: relative;
         display: flex;
         justify-content: center;
-        align-items: center;
+        align-items: stretch;
         flex-direction: column;
-        color: #444;
+
+        color: #777;
         overflow: hidden;
     }
     div p {
+        background: #1a1a1a;
         font-size: 14px;
         text-transform: uppercase;
         letter-spacing: 3px;
         transition: 0.6s;
         font-weight: 200;
+        padding: 10px;
+        border-radius: 0px 0px 10px 10px;
     }
     canvas {
-        /*overflow: hidden;*/
+        min-height: 0; /* fixes issue in firefox */
+        padding: 0;
+        margin: 0;
         transition: 0.3s;
         height: 100%;
         width: calc(100% + 2px);
+        border-radius: 10px 10px 0px 0px;
+
+        image-rendering: optimizeSpeed;
+        image-rendering: -moz-crisp-edges;
+        image-rendering: -o-crisp-edges;
+        image-rendering: -webkit-optimize-contrast;
+        image-rendering: optimize-contrast;
+        image-rendering: crisp-edges;
         image-rendering: pixelated;
+        -ms-interpolation-mode: nearest-neighbor;
     }
     </style>
 </head>
@@ -108,16 +124,13 @@
         function wrapper(fn) { return () => {
             let data = generate(size);
             let result = Array.from(fn(data), (x) => x.slice(0));
-            if (result.length % 2 == 0) {
-                result.push(result[result.length-1]);
-            }
-            return result;
+            return [data].concat(result);
         }}
 
         // The sort functions were stolen almost as-is from various parts of the internet
         return {
             noop: wrapper(function* (arr) {
-                yield arr.slice(0);
+                yield arr;
                 return;
             }),
             bubble: wrapper(function* (arr) {
